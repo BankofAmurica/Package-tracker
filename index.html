@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Package Tracker</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
@@ -16,13 +14,6 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const { Package, Truck, Clock, Plus, RefreshCw, Edit2 } = lucide;
-
-        // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
-        const SUPABASE_URL = 'https://aqyfwmbbprnyldxfkabz.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxeWZ3bWJicHJueWxkeGZrYWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxOTIyNjIsImV4cCI6MjA3MDc2ODI2Mn0.tOB-aFn1C8MIjy4ep9Y-sQGjxyf-_rsY-LIGzFSxvh8';
-        
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const PackageTrackingApp = () => {
             const [packages, setPackages] = useState([]);
@@ -32,23 +23,22 @@
             const [editingId, setEditingId] = useState(null);
             const [editNickname, setEditNickname] = useState('');
 
+            // Load from localStorage on mount
             useEffect(() => {
-                loadPackages();
+                const saved = localStorage.getItem('packages');
+                if (saved) {
+                    try {
+                        setPackages(JSON.parse(saved));
+                    } catch (e) {
+                        console.log('Error loading saved packages');
+                    }
+                }
             }, []);
 
-            const loadPackages = async () => {
-                try {
-                    const { data, error } = await supabase
-                        .from('packages')
-                        .select('*')
-                        .order('created_at', { ascending: false });
-                    
-                    if (error) throw error;
-                    setPackages(data || []);
-                } catch (error) {
-                    console.error('Error loading packages:', error);
-                }
-            };
+            // Save to localStorage whenever packages change
+            useEffect(() => {
+                localStorage.setItem('packages', JSON.stringify(packages));
+            }, [packages]);
 
             const detectCarrier = (trackingNumber) => {
                 const cleaned = trackingNumber.replace(/\s+/g, '').toUpperCase();
@@ -92,8 +82,8 @@
                 
                 return {
                     status: randomStatus,
-                    estimated_delivery: deliveryDate.toLocaleDateString(),
-                    last_update: new Date().toLocaleString(),
+                    estimatedDelivery: deliveryDate.toLocaleDateString(),
+                    lastUpdate: new Date().toLocaleString(),
                     location: 'Distribution Center'
                 };
             };
@@ -103,233 +93,225 @@
                 
                 setIsLoading(true);
                 
-                try {
-                    const carrier = detectCarrier(newTracking);
-                    const trackingData = generateMockTrackingData(newTracking, carrier);
-                    
-                    const { data, error } = await supabase
-                        .from('packages')
-                        .insert([{
-                            tracking_number: newTracking.trim(),
-                            nickname: newNickname.trim() || `Package ${packages.length + 1}`,
-                            carrier,
-                            ...trackingData
-                        }])
-                        .select();
-                    
-                    if (error) throw error;
-                    
-                    setPackages([...data, ...packages]);
-                    setNewTracking('');
-                    setNewNickname('');
-                } catch (error) {
-                    console.error('Error adding package:', error);
-                    alert('Failed to add package. Please check your database connection.');
-                }
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
+                const carrier = detectCarrier(newTracking);
+                const trackingData = generateMockTrackingData(newTracking, carrier);
+                
+                const newPackage = {
+                    id: Date.now(),
+                    trackingNumber: newTracking.trim(),
+                    nickname: newNickname.trim() || `Package ${packages.length + 1}`,
+                    carrier,
+                    ...trackingData
+                };
+                
+                setPackages([newPackage, ...packages]);
+                setNewTracking('');
+                setNewNickname('');
                 setIsLoading(false);
             };
 
             const refreshPackage = async (packageId) => {
                 setIsLoading(true);
                 
-                try {
-                    const pkg = packages.find(p => p.id === packageId);
-                    const updatedData = generateMockTrackingData(pkg.tracking_number, pkg.carrier);
-                    
-                    const { error } = await supabase
-                        .from('packages')
-                        .update({
-                            ...updatedData,
-                            last_update: new Date().toLocaleString()
-                        })
-                        .eq('id', packageId);
-                    
-                    if (error) throw error;
-                    
-                    setPackages(packages.map(p => 
-                        p.id === packageId ? { ...p, ...updatedData } : p
-                    ));
-                } catch (error) {
-                    console.error('Error updating package:', error);
-                    alert('Failed to update package.');
-                }
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                setPackages(packages.map(pkg => {
+                    if (pkg.id === packageId) {
+                        const updatedData = generateMockTrackingData(pkg.trackingNumber, pkg.carrier);
+                        return { ...pkg, ...updatedData };
+                    }
+                    return pkg;
+                }));
                 
                 setIsLoading(false);
             };
 
-            const updateNickname = async (packageId, newNickname) => {
-                try {
-                    const { error } = await supabase
-                        .from('packages')
-                        .update({ nickname: newNickname })
-                        .eq('id', packageId);
-                    
-                    if (error) throw error;
-                    
-                    setPackages(packages.map(pkg => 
-                        pkg.id === packageId ? { ...pkg, nickname: newNickname } : pkg
-                    ));
-                    setEditingId(null);
-                    setEditNickname('');
-                } catch (error) {
-                    console.error('Error updating nickname:', error);
-                    alert('Failed to update nickname.');
-                }
+            const updateNickname = (packageId, newNickname) => {
+                setPackages(packages.map(pkg => 
+                    pkg.id === packageId ? { ...pkg, nickname: newNickname } : pkg
+                ));
+                setEditingId(null);
+                setEditNickname('');
             };
 
-            const removePackage = async (packageId) => {
-                try {
-                    const { error } = await supabase
-                        .from('packages')
-                        .delete()
-                        .eq('id', packageId);
-                    
-                    if (error) throw error;
-                    
-                    setPackages(packages.filter(pkg => pkg.id !== packageId));
-                } catch (error) {
-                    console.error('Error deleting package:', error);
-                    alert('Failed to delete package.');
-                }
+            const removePackage = (packageId) => {
+                setPackages(packages.filter(pkg => pkg.id !== packageId));
             };
 
-            return React.createElement('div', { className: "max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen" },
-                React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6 mb-6" },
-                    React.createElement('h1', { className: "text-3xl font-bold text-gray-800 mb-6 flex items-center" },
-                        React.createElement(Package, { className: "mr-3 text-blue-600" }),
-                        "Package Tracker"
-                    ),
-                    React.createElement('div', { className: "bg-gray-50 p-4 rounded-lg mb-6" },
-                        React.createElement('h2', { className: "text-xl font-semibold mb-4" }, "Add New Package"),
-                        React.createElement('div', { className: "flex flex-col sm:flex-row gap-3" },
-                            React.createElement('input', {
-                                type: "text",
-                                placeholder: "Enter tracking number",
-                                value: newTracking,
-                                onChange: (e) => setNewTracking(e.target.value),
-                                className: "flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            }),
-                            React.createElement('input', {
-                                type: "text",
-                                placeholder: "Package nickname (optional)",
-                                value: newNickname,
-                                onChange: (e) => setNewNickname(e.target.value),
-                                className: "flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            }),
-                            React.createElement('button', {
-                                onClick: addPackage,
-                                disabled: isLoading || !newTracking.trim(),
-                                className: "px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                            },
-                                isLoading ? React.createElement(RefreshCw, { className: "w-4 h-4 animate-spin mr-2" }) : React.createElement(Plus, { className: "w-4 h-4 mr-2" }),
-                                "Add Package"
-                            )
-                        )
-                    )
-                ),
-                React.createElement('div', { className: "space-y-4" },
-                    packages.length === 0 ? 
-                        React.createElement('div', { className: "bg-white rounded-lg shadow p-8 text-center" },
-                            React.createElement(Package, { className: "w-16 h-16 text-gray-300 mx-auto mb-4" }),
-                            React.createElement('p', { className: "text-gray-500 text-lg" }, "No packages tracked yet"),
-                            React.createElement('p', { className: "text-gray-400" }, "Add a tracking number above to get started")
-                        ) :
-                        packages.map((pkg) => {
-                            const colors = getCarrierColors(pkg.carrier);
-                            return React.createElement('div', {
-                                key: pkg.id,
-                                className: "bg-white rounded-lg shadow-md overflow-hidden",
-                                style: { borderLeft: `6px solid ${colors.primary}` }
-                            },
-                                React.createElement('div', { 
-                                    className: "p-6", 
-                                    style: { backgroundColor: colors.bg } 
-                                },
-                                    React.createElement('div', { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4" },
-                                        React.createElement('div', { className: "flex-1" },
-                                            editingId === pkg.id ?
-                                                React.createElement('div', { className: "flex items-center gap-2" },
-                                                    React.createElement('input', {
-                                                        type: "text",
-                                                        value: editNickname,
-                                                        onChange: (e) => setEditNickname(e.target.value),
-                                                        className: "text-xl font-bold bg-white border border-gray-300 rounded px-2 py-1",
-                                                        onKeyPress: (e) => e.key === 'Enter' && updateNickname(pkg.id, editNickname),
-                                                        autoFocus: true
-                                                    }),
-                                                    React.createElement('button', {
-                                                        onClick: () => updateNickname(pkg.id, editNickname),
-                                                        className: "text-green-600 hover:text-green-800"
-                                                    }, "✓"),
-                                                    React.createElement('button', {
-                                                        onClick: () => setEditingId(null),
-                                                        className: "text-red-600 hover:text-red-800"
-                                                    }, "✕")
-                                                ) :
-                                                React.createElement('div', { className: "flex items-center gap-2" },
-                                                    React.createElement('h3', { 
-                                                        className: "text-xl font-bold",
-                                                        style: { color: colors.text }
-                                                    }, pkg.nickname),
-                                                    React.createElement('button', {
-                                                        onClick: () => {
-                                                            setEditingId(pkg.id);
-                                                            setEditNickname(pkg.nickname);
-                                                        },
-                                                        className: "text-gray-500 hover:text-gray-700"
-                                                    }, React.createElement(Edit2, { className: "w-4 h-4" }))
-                                                ),
-                                            React.createElement('p', { className: "text-sm text-gray-600" }, pkg.tracking_number)
-                                        ),
-                                        React.createElement('div', { className: "flex items-center gap-3 mt-3 sm:mt-0" },
-                                            React.createElement('span', {
-                                                className: "px-3 py-1 rounded-full text-sm font-semibold text-white",
-                                                style: { backgroundColor: colors.primary }
-                                            },
-                                                React.createElement(Truck, { className: "w-4 h-4 inline mr-1" }),
-                                                pkg.carrier
-                                            ),
-                                            React.createElement('button', {
-                                                onClick: () => refreshPackage(pkg.id),
-                                                disabled: isLoading,
-                                                className: "text-gray-600 hover:text-gray-800 disabled:text-gray-400"
-                                            }, React.createElement(RefreshCw, { className: `w-5 h-5 ${isLoading ? 'animate-spin' : ''}` })),
-                                            React.createElement('button', {
-                                                onClick: () => removePackage(pkg.id),
-                                                className: "text-red-600 hover:text-red-800"
-                                            }, "✕")
-                                        )
-                                    ),
-                                    React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm" },
-                                        React.createElement('div', null,
-                                            React.createElement('p', { className: "font-semibold text-gray-700" }, "Status"),
-                                            React.createElement('p', { style: { color: colors.primary } }, pkg.status)
-                                        ),
-                                        React.createElement('div', null,
-                                            React.createElement('p', { className: "font-semibold text-gray-700 flex items-center" },
-                                                React.createElement(Clock, { className: "w-4 h-4 mr-1" }),
-                                                "Estimated Delivery"
-                                            ),
-                                            React.createElement('p', { style: { color: colors.primary } }, pkg.estimated_delivery)
-                                        ),
-                                        React.createElement('div', null,
-                                            React.createElement('p', { className: "font-semibold text-gray-700" }, "Last Update"),
-                                            React.createElement('p', { className: "text-gray-600" }, pkg.last_update)
-                                        )
-                                    ),
-                                    pkg.location && React.createElement('div', { className: "mt-3 text-sm" },
-                                        React.createElement('p', { className: "font-semibold text-gray-700" }, "Current Location"),
-                                        React.createElement('p', { style: { color: colors.primary } }, pkg.location)
-                                    )
-                                )
-                            );
-                        })
-                )
+            return (
+                <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
+                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-4 flex items-center">
+                            <span className="mr-3 text-2xl">📦</span>
+                            Package Tracker
+                        </h1>
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-sm text-green-700">
+                                ✅ Status: Working with local storage - packages saved in your browser
+                            </p>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                            <h2 className="text-xl font-semibold mb-4">Add New Package</h2>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Enter tracking number"
+                                    value={newTracking}
+                                    onChange={(e) => setNewTracking(e.target.value)}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Package nickname (optional)"
+                                    value={newNickname}
+                                    onChange={(e) => setNewNickname(e.target.value)}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                    onClick={addPackage}
+                                    disabled={isLoading || !newTracking.trim()}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                                >
+                                    {isLoading ? (
+                                        <span className="mr-2">⏳</span>
+                                    ) : (
+                                        <span className="mr-2">➕</span>
+                                    )}
+                                    Add Package
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {packages.length === 0 ? (
+                            <div className="bg-white rounded-lg shadow p-8 text-center">
+                                <div className="text-6xl mb-4">📦</div>
+                                <p className="text-gray-500 text-lg">No packages tracked yet</p>
+                                <p className="text-gray-400">Add a tracking number above to get started</p>
+                            </div>
+                        ) : (
+                            packages.map((pkg) => {
+                                const colors = getCarrierColors(pkg.carrier);
+                                return (
+                                    <div
+                                        key={pkg.id}
+                                        className="bg-white rounded-lg shadow-md overflow-hidden"
+                                        style={{ borderLeft: `6px solid ${colors.primary}` }}
+                                    >
+                                        <div 
+                                            className="p-6" 
+                                            style={{ backgroundColor: colors.bg }}
+                                        >
+                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                                                <div className="flex-1">
+                                                    {editingId === pkg.id ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={editNickname}
+                                                                onChange={(e) => setEditNickname(e.target.value)}
+                                                                className="text-xl font-bold bg-white border border-gray-300 rounded px-2 py-1"
+                                                                onKeyPress={(e) => e.key === 'Enter' && updateNickname(pkg.id, editNickname)}
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                onClick={() => updateNickname(pkg.id, editNickname)}
+                                                                className="text-green-600 hover:text-green-800 text-lg"
+                                                            >
+                                                                ✓
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingId(null)}
+                                                                className="text-red-600 hover:text-red-800 text-lg"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 
+                                                                className="text-xl font-bold"
+                                                                style={{ color: colors.text }}
+                                                            >
+                                                                {pkg.nickname}
+                                                            </h3>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingId(pkg.id);
+                                                                    setEditNickname(pkg.nickname);
+                                                                }}
+                                                                className="text-gray-500 hover:text-gray-700"
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    <p className="text-sm text-gray-600">{pkg.trackingNumber}</p>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-3 mt-3 sm:mt-0">
+                                                    <span
+                                                        className="px-3 py-1 rounded-full text-sm font-semibold text-white flex items-center"
+                                                        style={{ backgroundColor: colors.primary }}
+                                                    >
+                                                        <span className="mr-1">🚚</span>
+                                                        {pkg.carrier}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => refreshPackage(pkg.id)}
+                                                        disabled={isLoading}
+                                                        className="text-gray-600 hover:text-gray-800 disabled:text-gray-400 text-lg"
+                                                    >
+                                                        {isLoading ? '⏳' : '🔄'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => removePackage(pkg.id)}
+                                                        className="text-red-600 hover:text-red-800 text-lg"
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                                <div>
+                                                    <p className="font-semibold text-gray-700">Status</p>
+                                                    <p style={{ color: colors.primary }}>{pkg.status}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 flex items-center">
+                                                        <span className="mr-1">⏰</span>
+                                                        Estimated Delivery
+                                                    </p>
+                                                    <p style={{ color: colors.primary }}>{pkg.estimatedDelivery}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700">Last Update</p>
+                                                    <p className="text-gray-600">{pkg.lastUpdate}</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {pkg.location && (
+                                                <div className="mt-3 text-sm">
+                                                    <p className="font-semibold text-gray-700">Current Location</p>
+                                                    <p style={{ color: colors.primary }}>{pkg.location}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
             );
         };
 
-        ReactDOM.render(React.createElement(PackageTrackingApp), document.getElementById('root'));
+        ReactDOM.render(<PackageTrackingApp />, document.getElementById('root'));
     </script>
 </body>
 </html>
