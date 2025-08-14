@@ -4,580 +4,379 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📦 Package Tracker</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>"
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="max-w-4xl mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4 flex items-center">
+                <span class="mr-3 text-2xl">📦</span>
+                Package Tracker
+            </h1>
+            <div id="status" class="mb-4 p-3 rounded-lg border">
+                <p class="text-sm" id="status-text">Checking database connection...</p>
+            </div>
+            
+            <!-- Add Package Form -->
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <h2 class="text-xl font-semibold mb-4">Add New Package</h2>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input 
+                        type="text" 
+                        id="tracking-input" 
+                        placeholder="Enter tracking number"
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <input 
+                        type="text" 
+                        id="nickname-input" 
+                        placeholder="Package nickname (optional)"
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <button 
+                        id="add-btn" 
+                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                        <span class="mr-2">➕</span>
+                        Add Package
+                    </button>
+                </div>
+            </div>
+        </div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+        <!-- Packages List -->
+        <div id="packages-container" class="space-y-4">
+            <!-- Packages will be inserted here -->
+        </div>
+    </div>
 
+    <script>
         // 🔥 REPLACE THESE WITH YOUR ACTUAL SUPABASE CREDENTIALS
         const SUPABASE_URL = 'https://aqyfwmbbprnyldxfkabz.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxeWZ3bWJicHJueWxkeGZrYWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxOTIyNjIsImV4cCI6MjA3MDc2ODI2Mn0.tOB-aFn1C8MIjy4ep9Y-sQGjxyf-_rsY-LIGzFSxvh8';
         
-        // Simple Supabase client implementation
-        class SimpleSupabaseClient {
-            constructor(url, key) {
-                this.url = url;
-                this.key = key;
-                this.headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`,
-                    'apikey': key
-                };
-            }
-
-            from(table) {
-                return new SupabaseQueryBuilder(this.url, this.headers, table);
-            }
-        }
-
-        class SupabaseQueryBuilder {
-            constructor(url, headers, table) {
-                this.url = url;
-                this.headers = headers;
-                this.table = table;
-                this.selectFields = '*';
-                this.orderField = null;
-                this.orderAsc = true;
-            }
-
-            select(fields = '*') {
-                this.selectFields = fields;
-                return this;
-            }
-
-            order(field, options = {}) {
-                this.orderField = field;
-                this.orderAsc = options.ascending !== false;
-                return this;
-            }
-
-            eq(field, value) {
-                this.whereClause = `${field}=eq.${value}`;
-                return this;
-            }
-
-            async insert(data) {
-                try {
-                    const response = await fetch(`${this.url}/rest/v1/${this.table}`, {
-                        method: 'POST',
-                        headers: {
-                            ...this.headers,
-                            'Prefer': 'return=representation'
-                        },
-                        body: JSON.stringify(Array.isArray(data) ? data : [data])
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const result = await response.json();
-                    return { data: result, error: null };
-                } catch (error) {
-                    return { data: null, error };
-                }
-            }
-
-            async update(data) {
-                try {
-                    const url = `${this.url}/rest/v1/${this.table}${this.whereClause ? '?' + this.whereClause : ''}`;
-                    const response = await fetch(url, {
-                        method: 'PATCH',
-                        headers: this.headers,
-                        body: JSON.stringify(data)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    return { error: null };
-                } catch (error) {
-                    return { error };
-                }
-            }
-
-            async delete() {
-                try {
-                    const url = `${this.url}/rest/v1/${this.table}${this.whereClause ? '?' + this.whereClause : ''}`;
-                    const response = await fetch(url, {
-                        method: 'DELETE',
-                        headers: this.headers
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    return { error: null };
-                } catch (error) {
-                    return { error };
-                }
-            }
-
-            async then(resolve, reject) {
-                try {
-                    let url = `${this.url}/rest/v1/${this.table}?select=${this.selectFields}`;
-                    
-                    if (this.orderField) {
-                        url += `&order=${this.orderField}.${this.orderAsc ? 'asc' : 'desc'}`;
-                    }
-
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: this.headers
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    resolve({ data, error: null });
-                } catch (error) {
-                    resolve({ data: null, error });
-                }
-            }
-        }
-
-        // Initialize our simple Supabase client
-        let supabase = null;
+        // App state
+        let packages = [];
+        let isLoading = false;
         let dbConnected = false;
 
-        // Check if credentials are configured
+        // Database functions
+        async function makeSupabaseRequest(endpoint, options = {}) {
+            const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'apikey': SUPABASE_KEY,
+                ...options.headers
+            };
+
+            const response = await fetch(url, {
+                ...options,
+                headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response.json();
+        }
+
+        async function loadPackages() {
+            try {
+                updateStatus('Loading packages from database...', 'yellow');
+                const data = await makeSupabaseRequest('packages?select=*&order=created_at.desc');
+                packages = data;
+                dbConnected = true;
+                updateStatus(`✅ Database connected - ${packages.length} packages loaded`, 'green');
+                localStorage.setItem('packages', JSON.stringify(packages));
+                renderPackages();
+            } catch (error) {
+                console.error('Database error:', error);
+                updateStatus('❌ Database error - using local storage', 'red');
+                loadFromLocalStorage();
+            }
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('packages');
+            if (saved) {
+                try {
+                    packages = JSON.parse(saved);
+                    renderPackages();
+                } catch (e) {
+                    console.log('Error loading from localStorage');
+                }
+            }
+        }
+
+        function updateStatus(message, color) {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('status-text');
+            
+            statusText.textContent = message;
+            
+            // Remove all color classes
+            statusEl.className = 'mb-4 p-3 rounded-lg border';
+            
+            // Add color-specific classes
+            if (color === 'green') {
+                statusEl.classList.add('bg-green-50', 'border-green-200');
+                statusText.classList.add('text-green-700');
+            } else if (color === 'red') {
+                statusEl.classList.add('bg-red-50', 'border-red-200');
+                statusText.classList.add('text-red-700');
+            } else {
+                statusEl.classList.add('bg-yellow-50', 'border-yellow-200');
+                statusText.classList.add('text-yellow-700');
+            }
+        }
+
+        function detectCarrier(trackingNumber) {
+            const cleaned = trackingNumber.replace(/\s+/g, '').toUpperCase();
+            
+            if (/^1Z[0-9A-Z]{16}$/.test(cleaned)) return 'UPS';
+            if (/^[0-9]{12}$/.test(cleaned) || /^[0-9]{14}$/.test(cleaned)) return 'FedEx';
+            if (/^[0-9]{15}$/.test(cleaned)) return 'FedEx';
+            if (/^[0-9]{20}$/.test(cleaned)) return 'FedEx';
+            if (/^(94|93|92|94)[0-9]{20}$/.test(cleaned)) return 'USPS';
+            if (/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return 'USPS';
+            if (/^[0-9]{10,11}$/.test(cleaned)) return 'DHL';
+            if (/^[0-9]{4}[0-9]{4}[0-9]{2}$/.test(cleaned)) return 'DHL';
+            if (/^TBA[0-9]{12}$/.test(cleaned)) return 'Amazon';
+            if (/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return '17track';
+            if (/^[0-9]{13}$/.test(cleaned)) return '17track';
+            if (/^LP[0-9]{11}[A-Z]{2}$/.test(cleaned)) return '17track';
+            if (/^[A-Z]{1}[A-Z0-9]{1}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return '17track';
+            if (/^YT[0-9]{16}$/.test(cleaned)) return '17track';
+            
+            return 'Unknown';
+        }
+
+        function getCarrierColors(carrier) {
+            const colors = {
+                'UPS': { primary: '#8B4513', bg: '#FFF8DC', text: '#654321' },
+                'FedEx': { primary: '#4B0082', bg: '#F8F4FF', text: '#4B0082' },
+                'USPS': { primary: '#004B87', bg: '#F0F8FF', text: '#003366' },
+                'DHL': { primary: '#FFCC00', bg: '#FFFACD', text: '#B8860B' },
+                'Amazon': { primary: '#FF9900', bg: '#FFF4E6', text: '#E47911' },
+                '17track': { primary: '#2563EB', bg: '#EFF6FF', text: '#1E40AF' },
+                'Unknown': { primary: '#6B7280', bg: '#F9FAFB', text: '#374151' }
+            };
+            return colors[carrier] || colors['Unknown'];
+        }
+
+        function generateMockTrackingData() {
+            const statuses = ['Label Created', 'Package Accepted', 'In Transit', 'Out for Delivery', 'Delivered'];
+            const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+            const deliveryDate = new Date();
+            deliveryDate.setDate(deliveryDate.getDate() + Math.floor(Math.random() * 5) + 1);
+            
+            return {
+                status: randomStatus,
+                estimated_delivery: deliveryDate.toLocaleDateString(),
+                last_update: new Date().toLocaleString(),
+                location: 'Distribution Center'
+            };
+        }
+
+        async function addPackage() {
+            const trackingInput = document.getElementById('tracking-input');
+            const nicknameInput = document.getElementById('nickname-input');
+            const addBtn = document.getElementById('add-btn');
+            
+            const trackingNumber = trackingInput.value.trim();
+            if (!trackingNumber) return;
+            
+            isLoading = true;
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<span class="mr-2">⏳</span>Adding...';
+            
+            try {
+                const carrier = detectCarrier(trackingNumber);
+                const trackingData = generateMockTrackingData();
+                
+                const packageData = {
+                    tracking_number: trackingNumber,
+                    nickname: nicknameInput.value.trim() || `Package ${packages.length + 1}`,
+                    carrier,
+                    ...trackingData
+                };
+
+                if (dbConnected) {
+                    // Save to database
+                    const data = await makeSupabaseRequest('packages', {
+                        method: 'POST',
+                        headers: { 'Prefer': 'return=representation' },
+                        body: JSON.stringify(packageData)
+                    });
+                    
+                    packages.unshift(data[0]);
+                    updateStatus(`✅ Database connected - package saved to cloud`, 'green');
+                } else {
+                    // Save locally only
+                    const newPackage = { id: Date.now(), ...packageData };
+                    packages.unshift(newPackage);
+                }
+                
+                trackingInput.value = '';
+                nicknameInput.value = '';
+                localStorage.setItem('packages', JSON.stringify(packages));
+                renderPackages();
+            } catch (error) {
+                console.error('Error adding package:', error);
+                updateStatus('❌ Database error - saved locally only', 'red');
+                
+                // Fallback to local storage
+                const newPackage = {
+                    id: Date.now(),
+                    tracking_number: trackingNumber,
+                    nickname: nicknameInput.value.trim() || `Package ${packages.length + 1}`,
+                    carrier: detectCarrier(trackingNumber),
+                    ...generateMockTrackingData()
+                };
+                packages.unshift(newPackage);
+                localStorage.setItem('packages', JSON.stringify(packages));
+                renderPackages();
+                
+                trackingInput.value = '';
+                nicknameInput.value = '';
+            }
+            
+            isLoading = false;
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<span class="mr-2">➕</span>Add Package';
+        }
+
+        async function refreshPackage(packageId) {
+            try {
+                const pkg = packages.find(p => p.id === packageId);
+                const updatedData = generateMockTrackingData();
+                
+                if (dbConnected) {
+                    await makeSupabaseRequest(`packages?id=eq.${packageId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            ...updatedData,
+                            last_update: new Date().toLocaleString()
+                        })
+                    });
+                }
+                
+                // Update local state
+                const packageIndex = packages.findIndex(p => p.id === packageId);
+                if (packageIndex !== -1) {
+                    packages[packageIndex] = { ...packages[packageIndex], ...updatedData };
+                    localStorage.setItem('packages', JSON.stringify(packages));
+                    renderPackages();
+                }
+            } catch (error) {
+                console.error('Error updating package:', error);
+            }
+        }
+
+        async function removePackage(packageId) {
+            try {
+                if (dbConnected) {
+                    await makeSupabaseRequest(`packages?id=eq.${packageId}`, {
+                        method: 'DELETE'
+                    });
+                }
+                
+                packages = packages.filter(pkg => pkg.id !== packageId);
+                localStorage.setItem('packages', JSON.stringify(packages));
+                renderPackages();
+            } catch (error) {
+                console.error('Error deleting package:', error);
+                // Still delete locally
+                packages = packages.filter(pkg => pkg.id !== packageId);
+                localStorage.setItem('packages', JSON.stringify(packages));
+                renderPackages();
+            }
+        }
+
+        function renderPackages() {
+            const container = document.getElementById('packages-container');
+            
+            if (packages.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <div class="text-6xl mb-4">📦</div>
+                        <p class="text-gray-500 text-lg">No packages tracked yet</p>
+                        <p class="text-gray-400">Add a tracking number above to get started</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = packages.map(pkg => {
+                const colors = getCarrierColors(pkg.carrier);
+                return `
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden" style="border-left: 6px solid ${colors.primary}">
+                        <div class="p-6" style="background-color: ${colors.bg}">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold" style="color: ${colors.text}">${pkg.nickname}</h3>
+                                    <p class="text-sm text-gray-600">${pkg.tracking_number}</p>
+                                </div>
+                                <div class="flex items-center gap-3 mt-3 sm:mt-0">
+                                    <span class="px-3 py-1 rounded-full text-sm font-semibold text-white flex items-center" style="background-color: ${colors.primary}">
+                                        <span class="mr-1">🚚</span>
+                                        ${pkg.carrier}
+                                    </span>
+                                    <button onclick="refreshPackage(${pkg.id})" class="text-gray-600 hover:text-gray-800 text-lg">🔄</button>
+                                    <button onclick="removePackage(${pkg.id})" class="text-red-600 hover:text-red-800 text-lg">❌</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <p class="font-semibold text-gray-700">Status</p>
+                                    <p style="color: ${colors.primary}">${pkg.status}</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-700 flex items-center">
+                                        <span class="mr-1">⏰</span>
+                                        Estimated Delivery
+                                    </p>
+                                    <p style="color: ${colors.primary}">${pkg.estimated_delivery}</p>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-700">Last Update</p>
+                                    <p class="text-gray-600">${pkg.last_update}</p>
+                                </div>
+                            </div>
+                            ${pkg.location ? `
+                                <div class="mt-3 text-sm">
+                                    <p class="font-semibold text-gray-700">Current Location</p>
+                                    <p style="color: ${colors.primary}">${pkg.location}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Event listeners
+        document.getElementById('add-btn').addEventListener('click', addPackage);
+        document.getElementById('tracking-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addPackage();
+        });
+        document.getElementById('nickname-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addPackage();
+        });
+
+        // Initialize app
         if (SUPABASE_URL && SUPABASE_KEY && 
             SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && 
             SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
-            supabase = new SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
-            dbConnected = true;
+            loadPackages();
+        } else {
+            updateStatus('⚠️ Database not configured - using local storage only', 'yellow');
+            loadFromLocalStorage();
         }
-
-        const PackageTrackingApp = () => {
-            const [packages, setPackages] = useState([]);
-            const [newTracking, setNewTracking] = useState('');
-            const [newNickname, setNewNickname] = useState('');
-            const [isLoading, setIsLoading] = useState(false);
-            const [editingId, setEditingId] = useState(null);
-            const [editNickname, setEditNickname] = useState('');
-            const [dbStatus, setDbStatus] = useState('Checking database connection...');
-
-            useEffect(() => {
-                loadPackages();
-            }, []);
-
-            const loadPackages = async () => {
-                if (dbConnected && supabase) {
-                    try {
-                        setDbStatus('Loading packages from database...');
-                        const { data, error } = await supabase
-                            .from('packages')
-                            .select('*')
-                            .order('created_at', { ascending: false });
-                        
-                        if (error) throw error;
-                        
-                        setPackages(data || []);
-                        setDbStatus(`✅ Database connected - ${data?.length || 0} packages loaded`);
-                        
-                        // Also save to localStorage as backup
-                        localStorage.setItem('packages', JSON.stringify(data || []));
-                    } catch (error) {
-                        console.error('Database error:', error);
-                        setDbStatus('❌ Database error - using local storage');
-                        loadFromLocalStorage();
-                    }
-                } else {
-                    setDbStatus('⚠️ Database not configured - using local storage only');
-                    loadFromLocalStorage();
-                }
-            };
-
-            const loadFromLocalStorage = () => {
-                const saved = localStorage.getItem('packages');
-                if (saved) {
-                    try {
-                        setPackages(JSON.parse(saved));
-                    } catch (e) {
-                        console.log('Error loading from localStorage');
-                    }
-                }
-            };
-
-            // Save to localStorage whenever packages change (as backup)
-            useEffect(() => {
-                localStorage.setItem('packages', JSON.stringify(packages));
-            }, [packages]);
-
-            const detectCarrier = (trackingNumber) => {
-                const cleaned = trackingNumber.replace(/\s+/g, '').toUpperCase();
-                
-                if (/^1Z[0-9A-Z]{16}$/.test(cleaned)) return 'UPS';
-                if (/^[0-9]{12}$/.test(cleaned) || /^[0-9]{14}$/.test(cleaned)) return 'FedEx';
-                if (/^[0-9]{15}$/.test(cleaned)) return 'FedEx';
-                if (/^[0-9]{20}$/.test(cleaned)) return 'FedEx';
-                if (/^(94|93|92|94)[0-9]{20}$/.test(cleaned)) return 'USPS';
-                if (/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return 'USPS';
-                if (/^[0-9]{10,11}$/.test(cleaned)) return 'DHL';
-                if (/^[0-9]{4}[0-9]{4}[0-9]{2}$/.test(cleaned)) return 'DHL';
-                if (/^TBA[0-9]{12}$/.test(cleaned)) return 'Amazon';
-                if (/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return '17track';
-                if (/^[0-9]{13}$/.test(cleaned)) return '17track';
-                if (/^LP[0-9]{11}[A-Z]{2}$/.test(cleaned)) return '17track';
-                if (/^[A-Z]{1}[A-Z0-9]{1}[0-9]{9}[A-Z]{2}$/.test(cleaned)) return '17track';
-                if (/^YT[0-9]{16}$/.test(cleaned)) return '17track';
-                
-                return 'Unknown';
-            };
-
-            const getCarrierColors = (carrier) => {
-                const colors = {
-                    'UPS': { primary: '#8B4513', secondary: '#D2691E', bg: '#FFF8DC', text: '#654321' },
-                    'FedEx': { primary: '#4B0082', secondary: '#FF6B35', bg: '#F8F4FF', text: '#4B0082' },
-                    'USPS': { primary: '#004B87', secondary: '#ED1C24', bg: '#F0F8FF', text: '#003366' },
-                    'DHL': { primary: '#FFCC00', secondary: '#DC143C', bg: '#FFFACD', text: '#B8860B' },
-                    'Amazon': { primary: '#FF9900', secondary: '#146EB4', bg: '#FFF4E6', text: '#E47911' },
-                    '17track': { primary: '#2563EB', secondary: '#1D4ED8', bg: '#EFF6FF', text: '#1E40AF' },
-                    'Unknown': { primary: '#6B7280', secondary: '#9CA3AF', bg: '#F9FAFB', text: '#374151' }
-                };
-                return colors[carrier] || colors['Unknown'];
-            };
-
-            const generateMockTrackingData = (trackingNumber, carrier) => {
-                const statuses = ['Label Created', 'Package Accepted', 'In Transit', 'Out for Delivery', 'Delivered'];
-                const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-                const deliveryDate = new Date();
-                deliveryDate.setDate(deliveryDate.getDate() + Math.floor(Math.random() * 5) + 1);
-                
-                return {
-                    status: randomStatus,
-                    estimated_delivery: deliveryDate.toLocaleDateString(),
-                    last_update: new Date().toLocaleString(),
-                    location: 'Distribution Center'
-                };
-            };
-
-            const addPackage = async () => {
-                if (!newTracking.trim()) return;
-                
-                setIsLoading(true);
-                
-                try {
-                    const carrier = detectCarrier(newTracking);
-                    const trackingData = generateMockTrackingData(newTracking, carrier);
-                    
-                    const packageData = {
-                        tracking_number: newTracking.trim(),
-                        nickname: newNickname.trim() || `Package ${packages.length + 1}`,
-                        carrier,
-                        ...trackingData
-                    };
-
-                    if (dbConnected && supabase) {
-                        // Save to database
-                        const { data, error } = await supabase
-                            .from('packages')
-                            .insert([packageData]);
-                        
-                        if (error) throw error;
-                        
-                        // Reload packages to get the new one with its ID
-                        await loadPackages();
-                        setDbStatus(`✅ Database connected - package saved to cloud`);
-                    } else {
-                        // Save locally only
-                        const newPackage = { id: Date.now(), ...packageData };
-                        setPackages([newPackage, ...packages]);
-                    }
-                    
-                    setNewTracking('');
-                    setNewNickname('');
-                } catch (error) {
-                    console.error('Error adding package:', error);
-                    setDbStatus('❌ Database error - saved locally only');
-                    
-                    // Fallback to local storage
-                    const newPackage = {
-                        id: Date.now(),
-                        tracking_number: newTracking.trim(),
-                        nickname: newNickname.trim() || `Package ${packages.length + 1}`,
-                        carrier: detectCarrier(newTracking),
-                        ...generateMockTrackingData(newTracking, detectCarrier(newTracking))
-                    };
-                    setPackages([newPackage, ...packages]);
-                    setNewTracking('');
-                    setNewNickname('');
-                }
-                
-                setIsLoading(false);
-            };
-
-            const refreshPackage = async (packageId) => {
-                setIsLoading(true);
-                
-                try {
-                    const pkg = packages.find(p => p.id === packageId);
-                    const updatedData = generateMockTrackingData(pkg.tracking_number || pkg.trackingNumber, pkg.carrier);
-                    
-                    if (dbConnected && supabase) {
-                        const { error } = await supabase
-                            .from('packages')
-                            .update({
-                                ...updatedData,
-                                last_update: new Date().toLocaleString()
-                            })
-                            .eq('id', packageId);
-                        
-                        if (error) throw error;
-                    }
-                    
-                    setPackages(packages.map(p => 
-                        p.id === packageId ? { ...p, ...updatedData } : p
-                    ));
-                } catch (error) {
-                    console.error('Error updating package:', error);
-                    // Still update locally even if database fails
-                    const pkg = packages.find(p => p.id === packageId);
-                    const updatedData = generateMockTrackingData(pkg.tracking_number || pkg.trackingNumber, pkg.carrier);
-                    setPackages(packages.map(p => 
-                        p.id === packageId ? { ...p, ...updatedData } : p
-                    ));
-                }
-                
-                setIsLoading(false);
-            };
-
-            const updateNickname = async (packageId, newNickname) => {
-                try {
-                    if (dbConnected && supabase) {
-                        const { error } = await supabase
-                            .from('packages')
-                            .update({ nickname: newNickname })
-                            .eq('id', packageId);
-                        
-                        if (error) throw error;
-                    }
-                    
-                    setPackages(packages.map(pkg => 
-                        pkg.id === packageId ? { ...pkg, nickname: newNickname } : pkg
-                    ));
-                    setEditingId(null);
-                    setEditNickname('');
-                } catch (error) {
-                    console.error('Error updating nickname:', error);
-                    // Still update locally
-                    setPackages(packages.map(pkg => 
-                        pkg.id === packageId ? { ...pkg, nickname: newNickname } : pkg
-                    ));
-                    setEditingId(null);
-                    setEditNickname('');
-                }
-            };
-
-            const removePackage = async (packageId) => {
-                try {
-                    if (dbConnected && supabase) {
-                        const { error } = await supabase
-                            .from('packages')
-                            .delete()
-                            .eq('id', packageId);
-                        
-                        if (error) throw error;
-                    }
-                    
-                    setPackages(packages.filter(pkg => pkg.id !== packageId));
-                } catch (error) {
-                    console.error('Error deleting package:', error);
-                    // Still delete locally
-                    setPackages(packages.filter(pkg => pkg.id !== packageId));
-                }
-            };
-
-            return (
-                <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
-                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-4 flex items-center">
-                            <span className="mr-3 text-2xl">📦</span>
-                            Package Tracker
-                        </h1>
-                        <div className={`mb-4 p-3 rounded-lg border ${
-                            dbStatus.includes('✅') ? 'bg-green-50 border-green-200' : 
-                            dbStatus.includes('❌') ? 'bg-red-50 border-red-200' : 
-                            'bg-yellow-50 border-yellow-200'
-                        }`}>
-                            <p className={`text-sm ${
-                                dbStatus.includes('✅') ? 'text-green-700' : 
-                                dbStatus.includes('❌') ? 'text-red-700' : 
-                                'text-yellow-700'
-                            }`}>
-                                {dbStatus}
-                            </p>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                            <h2 className="text-xl font-semibold mb-4">Add New Package</h2>
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <input
-                                    type="text"
-                                    placeholder="Enter tracking number"
-                                    value={newTracking}
-                                    onChange={(e) => setNewTracking(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Package nickname (optional)"
-                                    value={newNickname}
-                                    onChange={(e) => setNewNickname(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <button
-                                    onClick={addPackage}
-                                    disabled={isLoading || !newTracking.trim()}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
-                                >
-                                    {isLoading ? (
-                                        <span className="mr-2">⏳</span>
-                                    ) : (
-                                        <span className="mr-2">➕</span>
-                                    )}
-                                    Add Package
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        {packages.length === 0 ? (
-                            <div className="bg-white rounded-lg shadow p-8 text-center">
-                                <div className="text-6xl mb-4">📦</div>
-                                <p className="text-gray-500 text-lg">No packages tracked yet</p>
-                                <p className="text-gray-400">Add a tracking number above to get started</p>
-                            </div>
-                        ) : (
-                            packages.map((pkg) => {
-                                const colors = getCarrierColors(pkg.carrier);
-                                return (
-                                    <div
-                                        key={pkg.id}
-                                        className="bg-white rounded-lg shadow-md overflow-hidden"
-                                        style={{ borderLeft: `6px solid ${colors.primary}` }}
-                                    >
-                                        <div 
-                                            className="p-6" 
-                                            style={{ backgroundColor: colors.bg }}
-                                        >
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-                                                <div className="flex-1">
-                                                    {editingId === pkg.id ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={editNickname}
-                                                                onChange={(e) => setEditNickname(e.target.value)}
-                                                                className="text-xl font-bold bg-white border border-gray-300 rounded px-2 py-1"
-                                                                onKeyPress={(e) => e.key === 'Enter' && updateNickname(pkg.id, editNickname)}
-                                                                autoFocus
-                                                            />
-                                                            <button
-                                                                onClick={() => updateNickname(pkg.id, editNickname)}
-                                                                className="text-green-600 hover:text-green-800 text-lg"
-                                                            >
-                                                                ✓
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setEditingId(null)}
-                                                                className="text-red-600 hover:text-red-800 text-lg"
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 
-                                                                className="text-xl font-bold"
-                                                                style={{ color: colors.text }}
-                                                            >
-                                                                {pkg.nickname}
-                                                            </h3>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingId(pkg.id);
-                                                                    setEditNickname(pkg.nickname);
-                                                                }}
-                                                                className="text-gray-500 hover:text-gray-700"
-                                                            >
-                                                                ✏️
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                    <p className="text-sm text-gray-600">{pkg.tracking_number || pkg.trackingNumber}</p>
-                                                </div>
-                                                
-                                                <div className="flex items-center gap-3 mt-3 sm:mt-0">
-                                                    <span
-                                                        className="px-3 py-1 rounded-full text-sm font-semibold text-white flex items-center"
-                                                        style={{ backgroundColor: colors.primary }}
-                                                    >
-                                                        <span className="mr-1">🚚</span>
-                                                        {pkg.carrier}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => refreshPackage(pkg.id)}
-                                                        disabled={isLoading}
-                                                        className="text-gray-600 hover:text-gray-800 disabled:text-gray-400 text-lg"
-                                                    >
-                                                        {isLoading ? '⏳' : '🔄'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => removePackage(pkg.id)}
-                                                        className="text-red-600 hover:text-red-800 text-lg"
-                                                    >
-                                                        ❌
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                                                <div>
-                                                    <p className="font-semibold text-gray-700">Status</p>
-                                                    <p style={{ color: colors.primary }}>{pkg.status}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-700 flex items-center">
-                                                        <span className="mr-1">⏰</span>
-                                                        Estimated Delivery
-                                                    </p>
-                                                    <p style={{ color: colors.primary }}>{pkg.estimated_delivery || pkg.estimatedDelivery}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-700">Last Update</p>
-                                                    <p className="text-gray-600">{pkg.last_update || pkg.lastUpdate}</p>
-                                                </div>
-                                            </div>
-                                            
-                                            {pkg.location && (
-                                                <div className="mt-3 text-sm">
-                                                    <p className="font-semibold text-gray-700">Current Location</p>
-                                                    <p style={{ color: colors.primary }}>{pkg.location}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        ReactDOM.render(<PackageTrackingApp />, document.getElementById('root'));
     </script>
 </body>
 </html>
