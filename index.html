@@ -150,13 +150,12 @@
         let supabase = null;
         let dbConnected = false;
 
-        try {
-            if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
-                supabase = new SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
-                dbConnected = true;
-            }
-        } catch (e) {
-            console.log('Supabase connection failed:', e);
+        // Check if credentials are configured
+        if (SUPABASE_URL && SUPABASE_KEY && 
+            SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && 
+            SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
+            supabase = new SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
+            dbConnected = true;
         }
 
         const PackageTrackingApp = () => {
