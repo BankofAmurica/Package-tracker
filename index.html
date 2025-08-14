@@ -7,7 +7,6 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
@@ -20,19 +19,141 @@
         const SUPABASE_URL = 'https://aqyfwmbbprnyldxfkabz.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxeWZ3bWJicHJueWxkeGZrYWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxOTIyNjIsImV4cCI6MjA3MDc2ODI2Mn0.tOB-aFn1C8MIjy4ep9Y-sQGjxyf-_rsY-LIGzFSxvh8';
         
-        // Initialize Supabase (will show error in status if credentials are wrong)
+        // Simple Supabase client implementation
+        class SimpleSupabaseClient {
+            constructor(url, key) {
+                this.url = url;
+                this.key = key;
+                this.headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`,
+                    'apikey': key
+                };
+            }
+
+            from(table) {
+                return new SupabaseQueryBuilder(this.url, this.headers, table);
+            }
+        }
+
+        class SupabaseQueryBuilder {
+            constructor(url, headers, table) {
+                this.url = url;
+                this.headers = headers;
+                this.table = table;
+                this.selectFields = '*';
+                this.orderField = null;
+                this.orderAsc = true;
+            }
+
+            select(fields = '*') {
+                this.selectFields = fields;
+                return this;
+            }
+
+            order(field, options = {}) {
+                this.orderField = field;
+                this.orderAsc = options.ascending !== false;
+                return this;
+            }
+
+            eq(field, value) {
+                this.whereClause = `${field}=eq.${value}`;
+                return this;
+            }
+
+            async insert(data) {
+                try {
+                    const response = await fetch(`${this.url}/rest/v1/${this.table}`, {
+                        method: 'POST',
+                        headers: {
+                            ...this.headers,
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify(Array.isArray(data) ? data : [data])
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    return { data: result, error: null };
+                } catch (error) {
+                    return { data: null, error };
+                }
+            }
+
+            async update(data) {
+                try {
+                    const url = `${this.url}/rest/v1/${this.table}${this.whereClause ? '?' + this.whereClause : ''}`;
+                    const response = await fetch(url, {
+                        method: 'PATCH',
+                        headers: this.headers,
+                        body: JSON.stringify(data)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    return { error: null };
+                } catch (error) {
+                    return { error };
+                }
+            }
+
+            async delete() {
+                try {
+                    const url = `${this.url}/rest/v1/${this.table}${this.whereClause ? '?' + this.whereClause : ''}`;
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: this.headers
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    return { error: null };
+                } catch (error) {
+                    return { error };
+                }
+            }
+
+            async then(resolve, reject) {
+                try {
+                    let url = `${this.url}/rest/v1/${this.table}?select=${this.selectFields}`;
+                    
+                    if (this.orderField) {
+                        url += `&order=${this.orderField}.${this.orderAsc ? 'asc' : 'desc'}`;
+                    }
+
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: this.headers
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    resolve({ data, error: null });
+                } catch (error) {
+                    resolve({ data: null, error });
+                }
+            }
+        }
+
+        // Initialize our simple Supabase client
         let supabase = null;
         let dbConnected = false;
-        
+
         try {
             if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
-                // Check if supabase is available
-                if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                    dbConnected = true;
-                } else {
-                    console.log('Supabase library not loaded properly');
-                }
+                supabase = new SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY);
+                dbConnected = true;
             }
         } catch (e) {
             console.log('Supabase connection failed:', e);
@@ -162,12 +283,12 @@
                         // Save to database
                         const { data, error } = await supabase
                             .from('packages')
-                            .insert([packageData])
-                            .select();
+                            .insert([packageData]);
                         
                         if (error) throw error;
                         
-                        setPackages([...data, ...packages]);
+                        // Reload packages to get the new one with its ID
+                        await loadPackages();
                         setDbStatus(`✅ Database connected - package saved to cloud`);
                     } else {
                         // Save locally only
