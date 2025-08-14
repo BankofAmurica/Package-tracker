@@ -25,7 +25,7 @@
         let dbConnected = false;
         
         try {
-            if (SUPABASE_URL !== 'https://aqyfwmbbprnyldxfkabz.supabase.co' && SUPABASE_KEY !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxeWZ3bWJicHJueWxkeGZrYWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxOTIyNjIsImV4cCI6MjA3MDc2ODI2Mn0.tOB-aFn1C8MIjy4ep9Y-sQGjxyf-_rsY-LIGzFSxvh8';') {
+            if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 dbConnected = true;
             }
