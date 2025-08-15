@@ -284,11 +284,23 @@
                     }
                 });
 
+                console.log('AfterShip response status:', response.status);
+                
                 if (!response.ok) {
-                    throw new Error(`AfterShip API error: ${response.status}`);
+                    console.error(`AfterShip API error: ${response.status} ${response.statusText}`);
+                    return null;
                 }
 
-                const data = await response.json();
+                const responseText = await response.text();
+                console.log('AfterShip raw response:', responseText);
+                
+                if (!responseText.trim()) {
+                    console.error('AfterShip returned empty response');
+                    return null;
+                }
+
+                const data = JSON.parse(responseText);
+                console.log('AfterShip parsed data:', data);
                 return data.data.tracking;
             } catch (error) {
                 console.error('Error fetching AfterShip tracking:', error);
@@ -463,6 +475,7 @@
                 if (!pkg) return;
 
                 updateStatus('Refreshing tracking data from AfterShip...', 'yellow');
+                console.log('Refreshing package:', pkg.tracking_number, pkg.carrier);
                 
                 // Get updated tracking from AfterShip
                 const tracking = await getAfterShipTracking(pkg.tracking_number, pkg.carrier);
@@ -471,19 +484,26 @@
                 if (tracking) {
                     updatedData = formatAfterShipData(tracking);
                     updateStatus('✅ Tracking data refreshed', 'green');
+                    console.log('Formatted tracking data:', updatedData);
                 } else {
                     // Keep existing data if refresh fails
                     updatedData = {
                         last_update: new Date().toLocaleString()
                     };
                     updateStatus('⚠️ Could not refresh - keeping existing data', 'yellow');
+                    console.log('AfterShip returned no data, keeping existing data');
                 }
                 
                 if (dbConnected) {
-                    await makeSupabaseRequest(`packages?id=eq.${packageId}`, {
-                        method: 'PATCH',
-                        body: JSON.stringify(updatedData)
-                    });
+                    try {
+                        await makeSupabaseRequest(`packages?id=eq.${packageId}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify(updatedData)
+                        });
+                    } catch (dbError) {
+                        console.error('Database update error:', dbError);
+                        // Continue with local update even if DB fails
+                    }
                 }
                 
                 // Update local state
