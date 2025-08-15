@@ -53,10 +53,10 @@
     </div>
 
     <script>
-        // 🔥 REPLACE THESE WITH YOUR ACTUAL CREDENTIALS
+        // 🔥 YOUR ACTUAL API CREDENTIALS
         const SUPABASE_URL = 'https://aqyfwmbbprnyldxfkabz.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxeWZ3bWJicHJueWxkeGZrYWJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxOTIyNjIsImV4cCI6MjA3MDc2ODI2Mn0.tOB-aFn1C8MIjy4ep9Y-sQGjxyf-_rsY-LIGzFSxvh8';
-        const AFTERSHIP_API_KEY = 'asat_5cb664406abd48c0b57ed79775828a5c'; // Add your AfterShip API key here
+        const AFTERSHIP_API_KEY = 'asat_5cb664406abd48c0b57ed79775828a5c';
         
         // App state
         let packages = [];
@@ -191,8 +191,19 @@
         }
 
         function getDaysUntilDelivery(deliveryDateString) {
+            // Handle "Unknown" or empty delivery dates
+            if (!deliveryDateString || deliveryDateString === 'Unknown' || deliveryDateString === '') {
+                return { days: null, status: 'unknown' };
+            }
+            
             try {
                 const deliveryDate = new Date(deliveryDateString);
+                
+                // Check if date is valid
+                if (isNaN(deliveryDate.getTime())) {
+                    return { days: null, status: 'unknown' };
+                }
+                
                 const today = new Date();
                 
                 // Reset time to start of day for accurate day calculation
@@ -217,7 +228,9 @@
         }
 
         function formatDaysUntilDelivery(deliveryInfo) {
-            if (deliveryInfo.days === null) return '';
+            if (deliveryInfo.days === null || deliveryInfo.status === 'unknown') {
+                return '<span class="text-gray-500">Delivery date unknown</span>';
+            }
             
             switch (deliveryInfo.status) {
                 case 'overdue':
@@ -229,7 +242,7 @@
                 case 'upcoming':
                     return `<span class="text-gray-600">${deliveryInfo.days} day${deliveryInfo.days > 1 ? 's' : ''} away</span>`;
                 default:
-                    return '';
+                    return '<span class="text-gray-500">Delivery date unknown</span>';
             }
         }
 
@@ -347,7 +360,7 @@
             const trackingNumber = trackingInput.value.trim();
             if (!trackingNumber) return;
             
-          if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'YOUR_AFTERSHIP_API_KEY_HERE') {
+            if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'YOUR_AFTERSHIP_API_KEY_HERE') {
                 alert('AfterShip API key not configured. Please add your API key to get real tracking data.');
                 return;
             }
@@ -521,9 +534,21 @@
             }
 
             // Sort packages by estimated delivery date (earliest first)
+            // Put packages with unknown delivery dates at the end
             const sortedPackages = [...packages].sort((a, b) => {
-                const dateA = new Date(a.estimated_delivery);
-                const dateB = new Date(b.estimated_delivery);
+                const dateA = a.estimated_delivery === 'Unknown' ? null : new Date(a.estimated_delivery);
+                const dateB = b.estimated_delivery === 'Unknown' ? null : new Date(b.estimated_delivery);
+                
+                // If both dates are unknown, sort by creation time (newest first)
+                if (!dateA && !dateB) {
+                    return b.id - a.id;
+                }
+                
+                // Unknown dates go to the end
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                
+                // Valid dates get sorted normally (earliest first)
                 return dateA - dateB;
             });
 
