@@ -347,7 +347,7 @@
             const trackingNumber = trackingInput.value.trim();
             if (!trackingNumber) return;
             
-            if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'asat_5cb664406abd48c0b57ed79775828a5c') {
+          if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'YOUR_AFTERSHIP_API_KEY_HERE') {
                 alert('AfterShip API key not configured. Please add your API key to get real tracking data.');
                 return;
             }
@@ -440,7 +440,7 @@
         }
 
         async function refreshPackage(packageId) {
-            if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'asat_5cb664406abd48c0b57ed79775828a5c') {
+            if (!AFTERSHIP_API_KEY || AFTERSHIP_API_KEY === 'YOUR_AFTERSHIP_API_KEY_HERE') {
                 alert('AfterShip API key not configured. Cannot refresh tracking data.');
                 return;
             }
